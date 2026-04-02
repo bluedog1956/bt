@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BLE Multi-Device Manager</title>
+    <style>
+        .device-card { border: 1px solid #ccc; padding: 10px; margin: 10px; border-radius: 8px; width: 300px; display: inline-block; vertical-align: top; }
+        .status { font-weight: bold; }
+        .connected { color: green; }
+        .disconnected { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Local Bluetooth Manager</h1>
+    <div id="device-container">
+        <!-- Device Slot 1 -->
+        <div class="device-card" id="slot-0">
+            <h3>F9</h3>
+            <p>Status: <span class="status disconnected">Disconnected</span></p>
+            <button onclick="connectDevice(0)">Connect</button>
+            <button onclick="disconnectDevice(0)" disabled>Disconnect</button>
+        </div>
+        <!-- Device Slot 2 -->
+        <div class="device-card" id="slot-1">
+            <h3>B8</h3>
+            <p>Status: <span class="status disconnected">Disconnected</span></p>
+            <button onclick="connectDevice(1)">Connect</button>
+            <button onclick="disconnectDevice(1)" disabled>Disconnect</button>
+        </div>
+        <!-- Device Slot 3 -->
+        <div class="device-card" id="slot-2">
+            <h3>Device 3</h3>
+            <p>Status: <span class="status disconnected">Disconnected</span></p>
+            <button onclick="connectDevice(2)">Connect</button>
+            <button onclick="disconnectDevice(2)" disabled>Disconnect</button>
+        </div>
+    </div>
+
+    <script>
+        const devices = [null, null, null];
+
+        async function connectDevice(index) {
+            try {
+                // Request any BLE device
+                const device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: ['battery_service'] // Add services your devices use
+                });
+
+                // Connect to GATT Server
+                const server = await device.gatt.connect();
+                devices[index] = device;
+
+                updateUI(index, true, device.name);
+                
+                device.addEventListener('gattserverdisconnected', () => {
+                    updateUI(index, false);
+                });
+            } catch (error) {
+                console.error("Connection failed:", error);
+            }
+        }
+
+        function disconnectDevice(index) {
+            if (devices[index] && devices[index].gatt.connected) {
+                devices[index].gatt.disconnect();
+                updateUI(index, false);
+            }
+        }
+
+        function updateUI(index, isConnected, name = "Device") {
+            const slot = document.getElementById(`slot-${index}`);
+            const statusLabel = slot.querySelector('.status');
+            const connectBtn = slot.querySelector('button:nth-of-type(1)');
+            const disconnectBtn = slot.querySelector('button:nth-of-type(2)');
+            const title = slot.querySelector('h3');
+
+            if (isConnected) {
+                statusLabel.textContent = "Connected";
+                statusLabel.className = "status connected";
+                title.textContent = name;
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+            } else {
+                statusLabel.textContent = "Disconnected";
+                statusLabel.className = "status disconnected";
+                title.textContent = `Device ${index + 1}`;
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+            }
+        }
+    </script>
+</body>
+</html>
