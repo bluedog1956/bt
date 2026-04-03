@@ -1,93 +1,79 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>BLE Multi-Device Manager</title>
+    <title>BT Controller</title>
     <style>
-        .device-card { border: 1px solid #ccc; padding: 10px; margin: 10px; border-radius: 8px; width: 300px; display: inline-block; vertical-align: top; }
-        .status { font-weight: bold; }
-        .connected { color: green; }
-        .disconnected { color: red; }
+        body { font-family: sans-serif; display: flex; gap: 20px; padding: 20px; }
+        .card { border: 2px solid #333; padding: 15px; border-radius: 10px; width: 150px; text-align: center; }
+        .status { font-size: 0.8em; margin: 10px 0; font-weight: bold; }
+        .on { color: green; } .off { color: red; }
     </style>
 </head>
 <body>
-    <h1>Local Bluetooth Manager</h1>
-    <div id="device-container">
-        <!-- Device Slot 1 -->
-        <div class="device-card" id="slot-0">
-            <h3>F9</h3>
-            <p>Status: <span class="status disconnected">Disconnected</span></p>
-            <button onclick="connectDevice(0)">Connect</button>
-            <button onclick="disconnectDevice(0)" disabled>Disconnect</button>
-        </div>
-        <!-- Device Slot 2 -->
-        <div class="device-card" id="slot-1">
-            <h3>B8</h3>
-            <p>Status: <span class="status disconnected">Disconnected</span></p>
-            <button onclick="connectDevice(1)">Connect</button>
-            <button onclick="disconnectDevice(1)" disabled>Disconnect</button>
-        </div>
-        <!-- Device Slot 3 -->
-        <div class="device-card" id="slot-2">
-            <h3>Device 3</h3>
-            <p>Status: <span class="status disconnected">Disconnected</span></p>
-            <button onclick="connectDevice(2)">Connect</button>
-            <button onclick="disconnectDevice(2)" disabled>Disconnect</button>
-        </div>
-    </div>
 
     <script>
-        const devices = [null, null, null];
+        // REPLACE THESE WITH YOUR ACTUAL DEVICE NAMES
+        const MY_DEVICES = ["B8", "F9", "OpenRun by Shokz"];
+        let deviceObjects = {};
 
-        async function connectDevice(index) {
+        async function init() {
+            // This triggers the picker ONCE to grant the website permission
+            // After this, you can just use Connect/Disconnect
             try {
-                // Request any BLE device
                 const device = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
-                    optionalServices: ['battery_service'] // Add services your devices use
+                    optionalServices: ['battery_service'] 
                 });
-
-                // Connect to GATT Server
-                const server = await device.gatt.connect();
-                devices[index] = device;
-
-                updateUI(index, true, device.name);
-                
-                device.addEventListener('gattserverdisconnected', () => {
-                    updateUI(index, false);
-                });
-            } catch (error) {
-                console.error("Connection failed:", error);
-            }
+                alert(`Authorized: ${device.name}. Refresh to see it in a slot.`);
+            } catch (e) { console.log("User cancelled or failed"); }
         }
 
-        function disconnectDevice(index) {
-            if (devices[index] && devices[index].gatt.connected) {
-                devices[index].gatt.disconnect();
-                updateUI(index, false);
+        async function toggle(name, index) {
+            const statusEl = document.getElementById(`status-${index}`);
+            
+            // Look for the device in previously permitted list
+            if (!deviceObjects[name]) {
+                const paired = await navigator.bluetooth.getDevices();
+                deviceObjects[name] = paired.find(d => d.name === name);
             }
-        }
 
-        function updateUI(index, isConnected, name = "Device") {
-            const slot = document.getElementById(`slot-${index}`);
-            const statusLabel = slot.querySelector('.status');
-            const connectBtn = slot.querySelector('button:nth-of-type(1)');
-            const disconnectBtn = slot.querySelector('button:nth-of-type(2)');
-            const title = slot.querySelector('h3');
+            const device = deviceObjects[name];
+            if (!device) return alert(`"${name}" not authorized. Use 'Initialize' first.`);
 
-            if (isConnected) {
-                statusLabel.textContent = "Connected";
-                statusLabel.className = "status connected";
-                title.textContent = name;
-                connectBtn.disabled = true;
-                disconnectBtn.disabled = false;
-            } else {
-                statusLabel.textContent = "Disconnected";
-                statusLabel.className = "status disconnected";
-                title.textContent = `Device ${index + 1}`;
-                connectBtn.disabled = false;
-                disconnectBtn.disabled = true;
+            try {
+                if (device.gatt.connected) {
+                    await device.gatt.disconnect();
+                    statusEl.innerText = "OFFLINE";
+                    statusEl.className = "status off";
+                } else {
+                    statusEl.innerText = "CONNECTING...";
+                    await device.gatt.connect();
+                    statusEl.innerText = "CONNECTED";
+                    statusEl.className = "status on";
+                }
+            } catch (err) {
+                statusEl.innerText = "ERROR";
+                console.error(err);
             }
         }
     </script>
+
+    <div style="position: absolute; top: 10px; right: 10px;">
+        <button onclick="init()">Initialize New Device</button>
+    </div>
+
+    <!-- Generate 3 slots based on names above -->
+    <script>
+        MY_DEVICES.forEach((name, i) => {
+            document.write(`
+                <div class="card">
+                    <strong>${name}</strong>
+                    <div id="status-${i}" class="status off">OFFLINE</div>
+                    <button onclick="toggle('${name}', ${i})">Connect / Disconnect</button>
+                </div>
+            `);
+        });
+    </script>
+
 </body>
 </html>
